@@ -1,32 +1,63 @@
-name: Build and Deploy Vite to Pages
+name: Build and Deploy to GitHub Pages
+
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+
 permissions:
+  contents: read
   pages: write
   id-token: write
-  contents: read
+
 concurrency:
   group: "pages"
   cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 'lts/*' }
-      - run: npm ci || npm install
-      - run: |
-          if [ -f vite.config.ts ] || [ -f vite.config.js ]; then
-            echo "Building Vite project"
-            npm run build
-          else
-            echo "No build needed"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # If there's a package.json, try to build (Vite/React/etc.)
+      - name: Setup Node (if needed)
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install deps (if needed)
+        if: hashFiles('package.json') != ''
+        run: npm ci || npm install
+
+      - name: Build (if script exists)
+        if: hashFiles('package.json') != ''
+        run: |
+          if npm run | grep -q " build"; then
+            npm run build || exit 1
           fi
-      - uses: actions/upload-pages-artifact@v3
+
+      # Ensure we have a dist/ to publish. If none, copy the repo root (static export) into dist.
+      - name: Prepare artifact
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "No dist/ found; publishing repo root."
+            mkdir -p dist
+            shopt -s dotglob
+            cp -r * dist/
+            # Don't publish the workflow itself
+            rm -rf dist/.github
+          fi
+          echo "Artifact contents:"
+          ls -lah dist | head -n 200
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
