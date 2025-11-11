@@ -8,3 +8,7 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
 });
+
+import { defineConfig } from 'vite'
+export default defineConfig({ base: '/<repo-name>/' })
+
