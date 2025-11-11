@@ -42,16 +42,23 @@ jobs:
       # Ensure we have a dist/ to publish. If none, copy the repo root (static export) into dist.
       - name: Prepare artifact
         run: |
-          if [ ! -d "dist" ]; then
-            echo "No dist/ found; publishing repo root."
-            mkdir -p dist
-            shopt -s dotglob
-            cp -r * dist/
-            # Don't publish the workflow itself
-            rm -rf dist/.github
+          set -e
+          if [ -d dist ] && [ "$(ls -A dist)" ]; then
+            echo "Using existing dist/ as artifact."
+          else
+            echo "No built dist/; creating artifact from repo root (excluding dist and .github)."
+            mkdir -p __site
+            rsync -av --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'dist' \
+            ./ __site/
+            rm -rf dist
+            mv __site dist
           fi
           echo "Artifact contents:"
-          ls -lah dist | head -n 200
+          ls -la dist | head -n 200
+
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
